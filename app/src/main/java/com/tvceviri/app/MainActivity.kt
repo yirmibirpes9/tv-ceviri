@@ -14,117 +14,84 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
-import com.google.mlkit.common.model.DownloadConditions
-import com.google.mlkit.nl.translate.TranslateLanguage
-import com.google.mlkit.nl.translate.Translation
-import com.google.mlkit.nl.translate.TranslatorOptions
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
 
+    private val SCREEN_CAPTURE_CODE = 1001
     private lateinit var statusText: TextView
-    private lateinit var mediaProjectionManager: MediaProjectionManager
 
-    private val screenCaptureLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setBackgroundColor(Color.parseColor("#121212"))
+            setPadding(48, 48, 48, 48)
+        }
+
+        val title = TextView(this).apply {
+            text = "TV Canlı Çeviri"
+            textSize = 28f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+        }
+
+        statusText = TextView(this).apply {
+            text = "Hazır. Başlatmak için aşağıdaki butona basın."
+            textSize = 18f
+            setTextColor(Color.LTGRAY)
+            gravity = Gravity.CENTER
+            setPadding(0, 24, 0, 36)
+        }
+
+        val startBtn = Button(this).apply {
+            text = "ÇEVİRİYİ BAŞLAT"
+            textSize = 22f
+            isFocusable = true
+            isFocusableInTouchMode = true
+            setOnClickListener { checkAndStart() }
+        }
+
+        layout.addView(title)
+        layout.addView(statusText)
+        layout.addView(startBtn)
+        setContentView(layout)
+        startBtn.requestFocus()
+    }
+
+    private fun checkAndStart() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            statusText.text = "Lütfen TV Ayarlar > Uygulamalar > Özel erişim > Diğer uygulamaların üzerinde göster iznini açın."
+            try {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
+                )
+                startActivity(intent)
+            } catch (e: Exception) {
+                Toast.makeText(this, "Ayarlar > Uygulamalar > Özel erişim menüsünden izin verin.", Toast.LENGTH_LONG).show()
+            }
+            return
+        }
+
+        val mgr = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        startActivityForResult(mgr.createScreenCaptureIntent(), SCREEN_CAPTURE_CODE)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == SCREEN_CAPTURE_CODE && resultCode == RESULT_OK && data != null) {
             val serviceIntent = Intent(this, SubtitleOverlayService::class.java).apply {
-                putExtra("RESULT_CODE", result.resultCode)
-                putExtra("DATA", result.data)
+                putExtra("RESULT_CODE", resultCode)
+                putExtra("DATA", data)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(serviceIntent)
             } else {
                 startService(serviceIntent)
             }
-            statusText.text = "Durum: Ekran okuma (OCR) aktif! Oyuna geçebilirsiniz."
-            moveTaskToBack(true)
-        } else {
-            statusText.text = "Durum: Ekran yakalama izni reddedildi."
+            statusText.text = "Çeviri aktif! Şimdi PS5 veya video ekranına geçebilirsiniz."
         }
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        mediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setBackgroundColor(Color.parseColor("#121212"))
-            setPadding(60, 60, 60, 60)
-        }
-
-        val title = TextView(this).apply {
-            text = "PS5 / TV Canlı OCR Altyazı Çeviri"
-            textSize = 26f
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-        }
-
-        statusText = TextView(this).apply {
-            text = "Durum: Çeviri dil paketi kontrol ediliyor..."
-            textSize = 16f
-            setTextColor(Color.LTGRAY)
-            gravity = Gravity.CENTER
-            setPadding(0, 20, 0, 40)
-        }
-
-        val btnStart = Button(this).apply {
-            text = "EKRAN OKUMAYI BAŞLAT"
-            textSize = 18f
-            isFocusable = true
-            requestFocus()
-            setOnClickListener { checkPermissionsAndCapture() }
-        }
-
-        val btnStop = Button(this).apply {
-            text = "DURDUR"
-            textSize = 18f
-            isFocusable = true
-            setOnClickListener {
-                stopService(Intent(this@MainActivity, SubtitleOverlayService::class.java))
-                statusText.text = "Durum: Servis durduruldu."
-            }
-        }
-
-        layout.addView(title)
-        layout.addView(statusText)
-        layout.addView(btnStart)
-        layout.addView(btnStop)
-        setContentView(layout)
-
-        prepareTranslator()
-    }
-
-    private fun prepareTranslator() {
-        val options = TranslatorOptions.Builder()
-            .setSourceLanguage(TranslateLanguage.ENGLISH)
-            .setTargetLanguage(TranslateLanguage.TURKISH)
-            .build()
-        val translator = Translation.getClient(options)
-        val conditions = DownloadConditions.Builder().build()
-
-        translator.downloadModelIfNeeded(conditions)
-            .addOnSuccessListener {
-                statusText.text = "Durum: İngilizce -> Türkçe modeli hazır!"
-            }
-            .addOnFailureListener { e ->
-                statusText.text = "Model indirme hatası: ${e.localizedMessage}"
-            }
-    }
-
-    private fun checkPermissionsAndCapture() {
-        if (!Settings.canDrawOverlays(this)) {
-            Toast.makeText(this, "Lütfen 'Diğer uygulamaların üzerinde göster' iznini açın", Toast.LENGTH_LONG).show()
-            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
-            startActivity(intent)
-            return
-        }
-
-        val captureIntent = mediaProjectionManager.createScreenCaptureIntent()
-        screenCaptureLauncher.launch(captureIntent)
     }
 }
