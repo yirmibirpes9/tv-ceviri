@@ -2,10 +2,9 @@
 <manifest xmlns:android="http://android.com">
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
 
     <uses-feature
         android:name="android.software.leanback"
@@ -16,7 +15,7 @@
 
     <application
         android:allowBackup="true"
-        android:label="TV Canlı Çeviri"
+        android:label="TV Canlı Çeviri (OCR)"
         android:theme="@style/Theme.AppCompat.NoActionBar">
 
         <activity
@@ -33,7 +32,7 @@
             android:name=".SubtitleOverlayService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="microphone" />
+            android:foregroundServiceType="mediaProjection" />
     </application>
 
 </manifest>
