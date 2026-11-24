@@ -1,9 +1,10 @@
 package com.tvceviri.app
 
-import android.Manifest
+import android.app.Activity
+import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.Color
+import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -13,9 +14,8 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.Translation
@@ -24,9 +24,31 @@ import com.google.mlkit.nl.translate.TranslatorOptions
 class MainActivity : AppCompatActivity() {
 
     private lateinit var statusText: TextView
+    private lateinit var mediaProjectionManager: MediaProjectionManager
+
+    private val screenCaptureLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            val serviceIntent = Intent(this, SubtitleOverlayService::class.java).apply {
+                putExtra("RESULT_CODE", result.resultCode)
+                putExtra("DATA", result.data)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
+            statusText.text = "Durum: Ekran okuma (OCR) aktif! Oyuna geçebilirsiniz."
+            moveTaskToBack(true)
+        } else {
+            statusText.text = "Durum: Ekran yakalama izni reddedildi."
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        mediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
 
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -36,7 +58,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val title = TextView(this).apply {
-            text = "PS5 / TV Anlık Altyazı Çeviri"
+            text = "PS5 / TV Canlı OCR Altyazı Çeviri"
             textSize = 26f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
@@ -51,15 +73,15 @@ class MainActivity : AppCompatActivity() {
         }
 
         val btnStart = Button(this).apply {
-            text = "ÇEVİRİYİ BAŞLAT (OYUN ÜSTÜ)"
+            text = "EKRAN OKUMAYI BAŞLAT"
             textSize = 18f
             isFocusable = true
             requestFocus()
-            setOnClickListener { checkPermissionsAndStart() }
+            setOnClickListener { checkPermissionsAndCapture() }
         }
 
         val btnStop = Button(this).apply {
-            text = "ÇEVİRİYİ DURDUR"
+            text = "DURDUR"
             textSize = 18f
             isFocusable = true
             setOnClickListener {
@@ -94,7 +116,7 @@ class MainActivity : AppCompatActivity() {
             }
     }
 
-    private fun checkPermissionsAndStart() {
+    private fun checkPermissionsAndCapture() {
         if (!Settings.canDrawOverlays(this)) {
             Toast.makeText(this, "Lütfen 'Diğer uygulamaların üzerinde göster' iznini açın", Toast.LENGTH_LONG).show()
             val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
@@ -102,18 +124,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 101)
-            return
-        }
-
-        val serviceIntent = Intent(this, SubtitleOverlayService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent)
-        } else {
-            startService(serviceIntent)
-        }
-        statusText.text = "Durum: Altyazı katmanı aktif! HDMI girişine geçebilirsiniz."
-        moveTaskToBack(true)
+        val captureIntent = mediaProjectionManager.createScreenCaptureIntent()
+        screenCaptureLauncher.launch(captureIntent)
     }
 }
