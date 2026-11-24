@@ -173,7 +173,6 @@ class SubtitleOverlayService : Service() {
             val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
             val now = System.currentTimeMillis()
 
-            // Saniyede ~2.5 kare işleyerek TV işlemcisini yormadan akıcı takip sağlar
             if (isProcessing || now - lastProcessedTime < 400) {
                 image.close()
                 return@setOnImageAvailableListener
@@ -197,7 +196,6 @@ class SubtitleOverlayService : Service() {
                 fullBitmap.copyPixelsFromBuffer(buffer)
                 image.close()
 
-                // Görüntünün en alt %18'lik altyazı bölgesini kırp
                 val cropHeight = (screenHeight * 0.18).toInt()
                 val cropY = screenHeight - cropHeight
                 val croppedBitmap = Bitmap.createBitmap(fullBitmap, 0, cropY, screenWidth, cropHeight)
@@ -224,7 +222,6 @@ class SubtitleOverlayService : Service() {
                     return@addOnSuccessListener
                 }
 
-                // Aynı altyazı ekrandaysa tekrar çeviri yapma
                 if (rawText.equals(lastDetectedText, ignoreCase = true)) {
                     bitmap.recycle()
                     isProcessing = false
@@ -265,3 +262,10 @@ class SubtitleOverlayService : Service() {
         if (::backgroundThread.isInitialized) {
             backgroundThread.quitSafely()
         }
+        if (::subtitleView.isInitialized) {
+            windowManager.removeView(subtitleView)
+        }
+        super.onDestroy()
+    }
+
+override fun onBind(intent: Intent?): IBinder? = null}
