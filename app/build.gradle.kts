@@ -11,8 +11,8 @@ android {
         applicationId = "com.tvceviri.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.0-OCR"
     }
 
     buildTypes {
@@ -32,5 +32,6 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("com.google.mlkit:text-recognition:16.0.0")
     implementation("com.google.mlkit:translate:17.0.2")
 }
